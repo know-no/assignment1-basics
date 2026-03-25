@@ -1,6 +1,108 @@
 
+import os
 import re
-import regex 
+from collections import defaultdict
+
+import regex
+
+from cs336_basics.pretokenization_example import find_chunk_boundaries
+
+
+def train_bpe(
+    input_path: str | os.PathLike,
+    vocab_size: int,
+    special_tokens: list[str] | None = None,
+) -> tuple[dict[int, bytes], list[tuple[bytes, bytes]]]:
+    """
+    Train a BPE tokenizer on the given corpus with GPT-2 style pre-tokenization.
+    Uses find_chunk_boundaries to split the file into chunks at special token
+    boundaries, avoiding loading the entire file into memory at once.
+
+    Returns:
+        vocab: mapping from token ID to token bytes
+        merges: list of (bytes, bytes) merge pairs in order of creation
+    """
+    special_tokens = special_tokens or []
+    GPT2_PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
+
+    # 1. Split file into chunks at special token boundaries using find_chunk_boundaries
+    #    Each chunk is guaranteed not to split a special token across boundaries.
+    #    The special token used for splitting is the first one (or a dummy newline if none).
+    split_token = special_tokens[0].encode("utf-8") if special_tokens else b"\n"
+    num_chunks = os.cpu_count() or 4
+
+    word_freqs: dict[tuple[bytes, ...], int] = {}
+
+    with open(input_path, "rb") as f:
+        boundaries = find_chunk_boundaries(f, num_chunks, split_token)
+
+        for start, end in zip(boundaries[:-1], boundaries[1:]):
+            f.seek(start)
+            chunk_bytes = f.read(end - start)
+            chunk_text = chunk_bytes.decode("utf-8", errors="ignore")
+
+            # 2. Split on special tokens so their bytes never participate in merges
+            if special_tokens:
+                sorted_tokens = sorted(special_tokens, key=len, reverse=True)
+                pattern = "|".join(re.escape(t) for t in sorted_tokens)
+                parts = re.split(pattern, chunk_text)
+            else:
+                parts = [chunk_text]
+
+            # 3. Pre-tokenize (GPT-2 regex) and accumulate word frequencies
+            for part in parts:
+                if not part:
+                    continue
+                tokens = regex.findall(GPT2_PAT, part)
+                for tok in tokens:
+                    word = tuple(bytes([b]) for b in tok.encode("utf-8"))
+                    word_freqs[word] = word_freqs.get(word, 0) + 1
+
+    # 4. How many merges to perform
+    num_merges = vocab_size - 256 - len(special_tokens)
+    merges: list[tuple[bytes, bytes]] = []
+
+    # 5. Iterative BPE merging
+    for _ in range(num_merges):
+        # Count all adjacent pairs, weighted by word frequency
+        pair_counts: dict[tuple[bytes, bytes], int] = defaultdict(int)
+        for word, freq in word_freqs.items():
+            for j in range(len(word) - 1):
+                pair_counts[(word[j], word[j + 1])] += freq
+
+        if not pair_counts:
+            break
+
+        # Find the most frequent pair (break ties by lexicographic order of pair)
+        best_pair = max(pair_counts, key=lambda p: (pair_counts[p], p))
+        merges.append(best_pair)
+
+        # Merge best_pair in every word
+        new_word_freqs: dict[tuple[bytes, ...], int] = {}
+        for word, freq in word_freqs.items():
+            new_word: list[bytes] = []
+            j = 0
+            while j < len(word):
+                if j < len(word) - 1 and (word[j], word[j + 1]) == best_pair:
+                    new_word.append(word[j] + word[j + 1])
+                    j += 2
+                else:
+                    new_word.append(word[j])
+                    j += 1
+            key = tuple(new_word)
+            new_word_freqs[key] = new_word_freqs.get(key, 0) + freq
+        word_freqs = new_word_freqs
+
+    # 6. Build vocab: 256 base bytes → special tokens → merged tokens
+    vocab: dict[int, bytes] = {i: bytes([i]) for i in range(256)}
+    for i, token in enumerate(special_tokens):
+        vocab[256 + i] = token.encode("utf-8")
+    for i, (a, b) in enumerate(merges):
+        vocab[256 + len(special_tokens) + i] = a + b
+
+    return vocab, merges
+
+
 class Tokenizer:
     def __init__(self, vocab: dict[int, bytes],merges: list[tuple[bytes, bytes]],special_tokens: list[str] | None = None,):
         self.vocab = vocab
