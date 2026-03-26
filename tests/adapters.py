@@ -11,6 +11,7 @@ from torch import Tensor
 
 from cs336_basics.tokenizer import Tokenizer, train_bpe
 from cs336_basics.linear import Linear
+from cs336_basics.embedding import Embedding
 
 
 def run_linear(
@@ -55,8 +56,10 @@ def run_embedding(
     Returns:
         Float[Tensor, "... d_model"]: Batch of embeddings returned by your Embedding layer.
     """
+    embd = Embedding(vocab_size, d_model)
+    embd.weights = torch.nn.Parameter(weights)
+    return embd.forward(token_ids=token_ids)
 
-    raise NotImplementedError
 
 
 def run_swiglu(
