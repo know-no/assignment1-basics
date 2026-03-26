@@ -13,6 +13,7 @@ from cs336_basics.tokenizer import Tokenizer, train_bpe
 from cs336_basics.linear import Linear
 from cs336_basics.embedding import Embedding
 from cs336_basics.rms_norm import RMSNorm
+from cs336_basics.ffn import FFN
 
 
 def run_linear(
@@ -92,7 +93,14 @@ def run_swiglu(
     # swiglu.w1.weight.data = w1_weight
     # swiglu.w2.weight.data = w2_weight
     # swiglu.w3.weight.data = w3_weight
-    raise NotImplementedError
+    ffn = FFN(d_model=d_model, dff=d_ff)
+    ffn.w1 = torch.nn.Parameter(w1_weight.T)
+    ffn.w3 = torch.nn.Parameter(w3_weight.T)
+    ffn.w2 = torch.nn.Parameter(w2_weight.T)
+
+    return ffn.forward(in_features)
+
+
 
 
 def run_scaled_dot_product_attention(
