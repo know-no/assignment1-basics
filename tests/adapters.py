@@ -14,7 +14,7 @@ from cs336_basics.linear import Linear
 from cs336_basics.embedding import Embedding
 from cs336_basics.rms_norm import RMSNorm
 from cs336_basics.ffn import FFN
-
+from cs336_basics.rope import StrictRoPE, OptimizedRoPE, OptimizedRoPEFixed
 
 def run_linear(
     d_in: int,
@@ -217,7 +217,11 @@ def run_rope(
     Returns:
         Float[Tensor, " ... sequence_length d_k"]: Tensor with RoPEd input.
     """
-    raise NotImplementedError
+    strict_rope = StrictRoPE(theta=theta, d_k=d_k, max_seq_len=max_seq_len)
+    ans = strict_rope.forward(in_query_or_key, token_positions)
+    # optimized_rope = OptimizedRoPEFixed(theta=theta, d_k=d_k, max_seq_len=max_seq_len)
+    # ans = optimized_rope(in_query_or_key, token_positions)
+    return ans
 
 
 def run_transformer_block(
@@ -317,7 +321,7 @@ def run_transformer_lm(
         num_heads (int): Number of heads to use in multi-headed attention. `d_model` must be
             evenly divisible by `num_heads`.
         d_ff (int): Dimensionality of the feed-forward inner layer (section 3.3).
-        rope_theta (float): The RoPE $\Theta$ parameter.
+        rope_theta (float): The RoPE $Theta$ parameter.
         weights (dict[str, Tensor]):
             State dict of our reference implementation. {num_layers} refers to an
             integer between `0` and `num_layers - 1` (the layer index).
