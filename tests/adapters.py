@@ -15,6 +15,7 @@ from cs336_basics.embedding import Embedding
 from cs336_basics.rms_norm import RMSNorm
 from cs336_basics.ffn import FFN
 from cs336_basics.rope import StrictRoPE, OptimizedRoPE, OptimizedRoPEFixed
+from cs336_basics.scale_dot_production_attention import soft_max_normal, soft_max_stable, scale_dot_production_attention
 
 def run_linear(
     d_in: int,
@@ -121,7 +122,7 @@ def run_scaled_dot_product_attention(
     Returns:
         Float[Tensor, " ... queries d_v"]: Output of SDPA
     """
-    raise NotImplementedError
+    return scale_dot_production_attention(Q,K,V,mask)
 
 
 def run_multihead_self_attention(
@@ -456,7 +457,8 @@ def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, "
         Float[Tensor, "..."]: Tensor of with the same shape as `in_features` with the output of
         softmax normalizing the specified `dim`.
     """
-    raise NotImplementedError
+    return soft_max_stable(in_features)
+    # return soft_max_normal(in_features)
 
 
 def run_cross_entropy(
