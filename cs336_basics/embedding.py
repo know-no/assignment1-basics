@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch
 
 class Embedding(nn.Module):
-    def __init__(self, num_embeddings, embedding_dim: int, device=None, dtype=None):
+    def __init__(self, num_embeddings:int, embedding_dim: int, device=None, dtype=None):
         super(Embedding, self).__init__()
         self.num_embeddings = num_embeddings;
         self.embedding_dim =  embedding_dim;

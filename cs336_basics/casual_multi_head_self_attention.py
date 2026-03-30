@@ -60,11 +60,12 @@ class CasualMultiHeadSelfAttention(nn.Module):
 
 
 class CasualMultiHeadSelfAttentionRoPE(nn.Module):
-    def __init__(self, d_model: int, num_heads: int, theta: float, max_seq_len: int, ):
+    def __init__(self, d_model: int, num_heads: int, theta: float, max_seq_len: int, context_length: int | None =None):
         super().__init__()
         self.d_model = d_model
         self.num_heads = num_heads
         self.head_dim = self.d_model // self.num_heads
+        self.context_length = context_length
         self.rope = StrictRoPE(theta=theta, d_k = self.head_dim, max_seq_len=max_seq_len)
 
         self.wq = nn.Parameter(torch.randn(self.d_model, self.d_model))
@@ -108,6 +109,17 @@ class CasualMultiHeadSelfAttentionRoPE(nn.Module):
 
         if mask is None:
             mask = torch.tril(torch.ones(seq_len, seq_len, dtype=torch.bool, device=x.device))
+        if self.context_length is not None and self.context_length < q.shape[-2] \
+            and self.context_length > 0: # > 0, 是某些人的实现会把 none 变成负数传递进来
+            q_len = q.shape[-2]
+            k_len = k.shape[-2]
+            row_idx = (k_len - q_len) + torch.arange(q_len, device=q.device)
+            col_idx = torch.arange(k.shape[-2], device=q.device)
+            dist = row_idx[:, None] - col_idx[None, :] # (q_len, k_len)
+            local_mask = (dist >= 0) & (dist < self.context_length)
+            # dist = row_idx.unsqueeze(1) - col_idx.unsqueeze(0)
+            # local_mask = (dist >= 0) & (dist < self.context_length)
+            mask = mask & local_mask
         attn_scores = attn_scores.masked_fill(~mask, float("-inf"))
 
         attn_probs = torch.softmax(attn_scores, dim=-1)

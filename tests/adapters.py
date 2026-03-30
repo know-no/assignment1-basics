@@ -17,6 +17,7 @@ from cs336_basics.ffn import FFN
 from cs336_basics.rope import StrictRoPE, OptimizedRoPE, OptimizedRoPEFixed
 from cs336_basics.scale_dot_production_attention import soft_max_normal, soft_max_stable, scale_dot_production_attention
 from cs336_basics.casual_multi_head_self_attention import CasualMultiHeadSelfAttention, CasualMultiHeadSelfAttentionRoPE
+from cs336_basics.full_llm import PreNormTransformerBlock, SimpleTransformer
 
 def run_linear(
     d_in: int,
@@ -306,7 +307,29 @@ def run_transformer_block(
         Float[Tensor, "batch sequence_length d_model"] Tensor with the output of
         running the Transformer block on the input features while using RoPE.
     """
-    raise NotImplementedError
+    block = PreNormTransformerBlock(
+        d_model=d_model,
+        num_heads=num_heads,
+        d_ff=d_ff,
+        theta=theta,
+        max_seq_len=max_seq_len,
+    )
+
+    block.casual_attention.wq = torch.nn.Parameter(weights["attn.q_proj.weight"])
+    block.casual_attention.wk = torch.nn.Parameter(weights["attn.k_proj.weight"])
+    block.casual_attention.wv = torch.nn.Parameter(weights["attn.v_proj.weight"])
+    block.casual_attention.wo = torch.nn.Parameter(weights["attn.output_proj.weight"])
+
+    block.ln1.weight = torch.nn.Parameter(weights["ln1.weight"])
+    block.ln2.weight = torch.nn.Parameter(weights["ln2.weight"])
+
+    # FFN stores parameters as (d_model, d_ff), (d_model, d_ff), (d_ff, d_model)
+    # while reference weights are saved as Linear(out_features, in_features).
+    block.ffn.w1 = torch.nn.Parameter(weights["ffn.w1.weight"].T)
+    block.ffn.w2 = torch.nn.Parameter(weights["ffn.w2.weight"].T)
+    block.ffn.w3 = torch.nn.Parameter(weights["ffn.w3.weight"].T)
+
+    return block.forward(in_features)
 
 
 def run_transformer_lm(
@@ -388,7 +411,38 @@ def run_transformer_lm(
         Float[Tensor, "batch_size sequence_length vocab_size"]: Tensor with the predicted unnormalized
         next-word distribution for each token.
     """
-    raise NotImplementedError
+    transformer = SimpleTransformer(
+        d_model=d_model,
+        num_heads=num_heads,
+        d_ff=d_ff,
+        theta=rope_theta,
+        max_seq_len=context_length,
+        vocab_size=vocab_size,
+        context_length=context_length,
+        num_layers=num_layers,
+    )
+
+    transformer.embedding.weights = torch.nn.Parameter(weights["token_embeddings.weight"])
+    transformer.lm_final.weight = torch.nn.Parameter(weights["ln_final.weight"])
+    transformer.lm_head.weight = torch.nn.Parameter(weights["lm_head.weight"])
+
+    for layer_idx in range(num_layers):
+        block = transformer.attention_layers[layer_idx]
+        prefix = f"layers.{layer_idx}."
+
+        block.casual_attention.wq = torch.nn.Parameter(weights[prefix + "attn.q_proj.weight"])
+        block.casual_attention.wk = torch.nn.Parameter(weights[prefix + "attn.k_proj.weight"])
+        block.casual_attention.wv = torch.nn.Parameter(weights[prefix + "attn.v_proj.weight"])
+        block.casual_attention.wo = torch.nn.Parameter(weights[prefix + "attn.output_proj.weight"])
+
+        block.ln1.weight = torch.nn.Parameter(weights[prefix + "ln1.weight"])
+        block.ln2.weight = torch.nn.Parameter(weights[prefix + "ln2.weight"])
+
+        block.ffn.w1 = torch.nn.Parameter(weights[prefix + "ffn.w1.weight"].T)
+        block.ffn.w2 = torch.nn.Parameter(weights[prefix + "ffn.w2.weight"].T)
+        block.ffn.w3 = torch.nn.Parameter(weights[prefix + "ffn.w3.weight"].T)
+
+    return transformer.forward(in_indices)
 
 
 def run_rmsnorm(
