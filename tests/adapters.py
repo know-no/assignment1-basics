@@ -18,6 +18,7 @@ from cs336_basics.rope import StrictRoPE, OptimizedRoPE, OptimizedRoPEFixed
 from cs336_basics.scale_dot_production_attention import soft_max_normal, soft_max_stable, scale_dot_production_attention
 from cs336_basics.casual_multi_head_self_attention import CasualMultiHeadSelfAttention, CasualMultiHeadSelfAttentionRoPE
 from cs336_basics.full_llm import PreNormTransformerBlock, SimpleTransformer
+from cs336_basics.cross_entropy_loss import cross_entropy_loss
 
 def run_linear(
     d_in: int,
@@ -541,7 +542,7 @@ def run_cross_entropy(
     Returns:
         Float[Tensor, ""]: The average cross-entropy loss across examples.
     """
-    raise NotImplementedError
+    return cross_entropy_loss(inputs, targets) 
 
 
 def run_gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm: float) -> None:
