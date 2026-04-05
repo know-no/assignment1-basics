@@ -17,20 +17,20 @@ from jaxtyping import Bool, Float, Int
 #     return loss_per_example.mean()
 
 def cross_entropy_loss(inputs: Float[Tensor, " batch_size vocab_size"], targets: Int[Tensor, " batch_size"]):
-    print()
-    print(inputs.shape)
+    # print()
+    # print(inputs.shape)
     max_vals = inputs.max(dim = -1, keepdim=True).values
     shifted = inputs - max_vals
 
     log_sum_exp = torch.log(torch.sum(torch.exp(shifted), dim = -1))
-    print()
-    print(log_sum_exp.shape)
+    # print()
+    # print(log_sum_exp.shape)
 
     targets_logits = inputs[torch.arange(inputs.shape[-2]), targets]
-    print(targets_logits.shape)
+    # print(targets_logits.shape)
 
-    print(max_vals.shape)
-    print(max_vals.squeeze(-1).shape)
+    # print(max_vals.shape)
+    # print(max_vals.squeeze(-1).shape)
     loss_per_example = -targets_logits + max_vals.squeeze(-1) + log_sum_exp
 
     return loss_per_example.mean()

@@ -22,6 +22,8 @@ from cs336_basics.cross_entropy_loss import cross_entropy_loss
 from cs336_basics.adamw import AdamWOptimizer
 from cs336_basics.learn_rate_scheduling import schedule_learning_rate
 from cs336_basics.clip_gradient import clip_gradient
+from cs336_basics.data_loader import load_data
+from cs336_basics.save_and_load import save, load
 
 def run_linear(
     d_in: int,
@@ -510,7 +512,12 @@ def run_get_batch(
         is the sampled input sequences, and the second tuple item is the corresponding
         language modeling labels.
     """
-    raise NotImplementedError
+    return load_data(
+        x=dataset,
+        batch_size=batch_size,
+        context_length=context_length,
+        device=device,
+    )
 
 
 def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, " ..."]:
@@ -611,7 +618,7 @@ def run_save_checkpoint(
             we've completed.
         out (str | os.PathLike | BinaryIO | IO[bytes]): Path or file-like object to serialize the model, optimizer, and iteration to.
     """
-    raise NotImplementedError
+    save(model=model, optimizer=optimizer, iteration=iteration, out=out)
 
 
 def run_load_checkpoint(
@@ -632,7 +639,7 @@ def run_load_checkpoint(
     Returns:
         int: the previously-serialized number of iterations.
     """
-    raise NotImplementedError
+    return load(src=src, model=model, optimizer=optimizer)
 
 
 def get_tokenizer(
